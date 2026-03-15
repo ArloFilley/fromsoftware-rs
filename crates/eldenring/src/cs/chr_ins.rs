@@ -391,9 +391,21 @@ pub impl ChrInsExt for Subclass<ChrIns> {
         }
     }
 
-    /// Set this character's HP to zero, killing it.
-    fn kill(&mut self) {
-        self.superclass_mut().module_container.data.hp = 0;
+    /// TODO: this doc comment
+    /// Set the hp of this character
+    /// Returns the new current hp of this character
+    /// `hp` will be clamped to 0 if hp<0 or character max hp if hp>character_max_hp
+    fn set_current_hp(&mut self, hp: i32) -> i32 {
+        let character_max_hp = self.superclass().module_container.data.max_hp;
+        let clamped_hp = hp.clamp(0, character_max_hp);
+
+        self.superclass_mut().module_container.data.hp = clamped_hp;
+        clamped_hp
+    }
+
+    /// Returns the current HP of this character
+    fn current_hp(&self) -> i32 {
+        self.superclass().module_container.data.hp
     }
 }
 
@@ -914,14 +926,22 @@ pub struct PlayerIns {
     unk718: [u8; 0x27],
 }
 
-impl FromStatic for PlayerIns {
+type MainPlayer = PlayerIns;
+impl FromStatic for MainPlayer {
     fn name() -> Cow<'static, str> {
-        "PlayerIns".into()
+        "MainPlayerIns".into()
     }
 
-    /// Returns the singleton instance of `PlayerIns` for the main player
+     /// Returns the singleton instance of `PlayerIns` for the main player
     /// character, if it exists.
-    unsafe fn instance() -> InstanceResult<&'static mut Self> {
+    /// 
+    /// ## Safety
+    /// 
+    /// In addition to [`FromStatic::instance`] safety requirements, 
+    /// the caller must ensure that no other references to [`WorldChrMan`] are
+    /// held at the time of calling. This method mutably borrows [`WorldChrMan`]
+    /// internally to reach `main_player`.
+    unsafe fn instance() -> InstanceResult<&'static mut MainPlayer> {
         unsafe {
             let Ok(world_chr_man) = WorldChrMan::instance() else {
                 return Err(InstanceError::NotFound);
